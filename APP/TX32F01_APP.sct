@@ -1,0 +1,11 @@
+; APP scatter: 链接到 0x01002000，避开 BL/META/BOOTFLAG/NVR
+LR_APP 0x01002000 0x00005800  {
+  ER_APP 0x01002000 0x00005800  {
+    *.o (RESET, +First)
+    *(InRoot$$Sections)
+    .ANY (+RO)
+  }
+  RW_APP 0x20000060 0x00000FA0  {
+    .ANY (+RW +ZI)
+  }
+}

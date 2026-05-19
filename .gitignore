@@ -1,0 +1,40 @@
+# =========== Keil μVision build artifacts ===========
+Objects/
+Listings/
+*.o
+*.crf
+*.d
+*.axf
+*.htm
+*.lnp
+*.dep
+*.lst
+*.map
+*.bak
+*.bak.*
+
+# Keil per-user GUI state
+*.uvguix.*
+EventRecorderStub.scvd
+JLinkLog.txt
+JLinkSettings.ini
+JLink Regs CM*.xml
+
+# our build / probe scripts log files
+build.log
+flash.log
+jlink_*.log
+com*.log
+*.output
+bootflag.bin
+
+# OS junk
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Editor junk
+.vscode/
+.idea/
+*.swp
+*.swo

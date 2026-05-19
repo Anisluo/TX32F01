@@ -1,0 +1,48 @@
+#include "Libra_periph.h"
+#include	"timer.h"
+
+
+u8 TIM0_Int_1s(void)
+{
+	    TIM_InitTypeDef TIM_InitStructure;
+
+    SCU_Unlock();			// 解锁SCU，可对其余SCU寄存器操作。
+    SCU_PeriphClockCmd(Periph_TIM0,ENABLE);//打开TIM0外设时钟
+    SCU_Lock();			  // 上锁SCU，不可对其余SCU寄存器操作。
+
+	
+	    TIM_DeInit(TIM0);//UART寄存器恢复默认值
+
+    //TIM0初始化
+    TIM_InitStructure.TIM_Mode = TIM_Mode_CNT;               			//比较输出模式（PWM输出）
+    TIM_InitStructure.TIM_Prescaler = GetSystemClock()/1000-1;                          //TIM时钟为系统时钟3分频
+    TIM_InitStructure.TIM_Period =1000-1;              //设置预分配系数，即PWM输出频率
+    TIM_Init(TIM0,&TIM_InitStructure);                              //初始化TIM
+
+	
+	
+//    TIM0->CR =0;//清零
+//    TIM0->CR |= 0x1<<3;//比较输出模式
+//    TIM0->DIV = GetSystemClock()/1000-1;//分频
+
+//    TIM0->ARR = 1000-1;//溢出时间1秒
+
+    TIM0->IER|=1;//开启中断
+    NVIC_EnableIRQ(TIM0_IRQn);// 打开TIM0中断
+    NVIC_SetPriority(TIM0_IRQn, 0x1);//中断优先级设置
+
+    TIM0->CR |=0x1 ;//计数器使能
+
+    return 0;
+}
+
+BOOL EnterIntFlag=FALSE;//中断标志
+
+void TIMER0_Handler(void)
+{
+    if (TIM0->IFR&0x1)// 检查CNTIF
+    {
+				EnterIntFlag=TRUE;
+        TIM0->IFR &=~0x1;// 清计数中断标志
+    }
+}

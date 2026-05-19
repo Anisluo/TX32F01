@@ -1,0 +1,13 @@
+; APP_COOP scatter: links behind bootloader at 0x01002000
+;   - Flash window: 0x01002000 .. 0x010077FF (22 KB)
+;   - SRAM window:  0x20000060 .. 0x20000FFF (4 KB - 96 B reserved for BL soft vectors)
+LR_COOP 0x01002000 0x00005800  {
+  ER_COOP 0x01002000 0x00005800  {
+    *.o (RESET, +First)
+    *(InRoot$$Sections)
+    .ANY (+RO)
+  }
+  RW_COOP 0x20000060 0x00000FA0  {
+    .ANY (+RW +ZI)
+  }
+}

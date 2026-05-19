@@ -1,0 +1,13 @@
+#include "TX32F01_periph.h"
+#include "key.h"
+
+
+void KEY_Init(void)
+{
+    SCU_Unlock();//解锁SCU，可对其余SCU寄存器操作。
+    SCU_PeriphClockCmd(Periph_GPIO1,ENABLE);//打开外设时钟
+    SCU_Lock();//上锁SCU，不可对其余SCU寄存器操作。
+
+    GPIO_Init(GPIO1,PIN02,GPIO_MODE_INPUT_PU);//P12配置成上拉输入
+}
+

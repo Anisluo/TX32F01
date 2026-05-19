@@ -1,0 +1,34 @@
+#include "Libra_periph.h"
+#include	"timer.h"
+
+
+void TIM0_Int_Delay(void)
+{
+    TIM_InitTypeDef TIM_InitStructure;
+
+    SCU_Unlock();			// 解锁SCU，可对其余SCU寄存器操作。
+    SCU_PeriphClockCmd(Periph_TIM0,ENABLE);//打开TIM0外设时钟
+    SCU_Lock();			  // 上锁SCU，不可对其余SCU寄存器操作。
+
+    TIM_DeInit(TIM0);//UART寄存器恢复默认值
+
+    //TIM0初始化
+    TIM_InitStructure.TIM_Mode = TIM_Mode_CNT;               			//计数模式
+    TIM_InitStructure.TIM_Prescaler = GetSystemClock()/1000-1;    //经过分频后，1ms计数一次
+    TIM_InitStructure.TIM_Period =1000-1;             					  //1ms计数一次，计数1000次，即1秒
+    TIM_Init(TIM0,&TIM_InitStructure);                             //初始化TIM
+
+}
+
+void Timer0_DelayMs(u32 ms)
+{
+    u32 i;
+	TIM_SetAutoreload(TIM0,ms-1);
+    TIM_Cmd(TIM0,ENABLE);//计数器使能
+
+        while(!TIM_GetFlagStatus(TIM0,TIM_IFR_CNTIF));
+        TIM_ClearFlag(TIM0,TIM_IFR_CNTIF);
+    
+    TIM_Cmd(TIM0,DISABLE);//计数器关闭
+}
+

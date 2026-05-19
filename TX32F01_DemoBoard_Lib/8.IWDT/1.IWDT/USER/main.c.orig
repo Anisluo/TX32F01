@@ -1,0 +1,57 @@
+#include "Libra_periph.h"
+#include	"systick.h"
+#include	"uart.h"
+#include	"wdt.h"
+#include	"KEY.h"
+
+
+void SCU_Init(void)
+{
+
+    SCU_Unlock();			// 解锁SCU，可对其余SCU寄存器操作。
+
+    SCU_SetSysClock(SysClock_24M);//系统时钟设置为32M
+
+//	SCU_PeriphClockCmd(Periph_ALL,ENABLE);//打开外设时钟
+
+    SCU_ResetPeriphClock(Periph_ALL);//复位所有外设模块
+
+    SCU_SetBor(BOR_2P5V,ENABLE);//设置BOR2.5V
+
+    SCU->RSR|=0x1;	//清除所有上电复位标志位
+
+    SCU_Lock();			// 上锁SCU，不可对其余SCU寄存器操作。
+
+}
+
+
+//注意，一旦开启看门狗，除了重新上电，无法关闭关闭（软件复位无法关闭看门狗）
+//因此，如果要使用IAP，需要在Bootloader中也开启看门狗
+int main(void)
+{
+    SCU_Init();
+    delay_init();
+    KEY_Init();
+    UART_Init(115200);
+
+    printf("发生复位！！！\r\n");
+    printf("看门狗实验！！！\r\n");
+
+    IWDT_Init();
+
+    while(1) 
+			{
+        if(!KEY_P12)//判断按键按下
+        {
+            delay_ms(30);//消抖
+            if(!KEY_P12)//再次确认按键是否按下
+            {
+                Feed_Dog();
+            }
+        }
+    }
+}
+
+
+
+
