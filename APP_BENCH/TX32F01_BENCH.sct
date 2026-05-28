@@ -1,0 +1,22 @@
+; ============================================================
+;  APP_BENCH scatter file
+;    APP Flash: 0x01002000 - 0x010077FF   (22 KB)
+;    SRAM     : 0x20000060 - 0x20000FFF
+;
+;  Note: fault_dump's NOINIT region (0x20000F00..FFF) is NOT
+;  reserved here. APP_BENCH does not link fault_dump — the
+;  whole point is to measure raw CPU, and a fault during the
+;  benchmark should just reset. If you decide to add fault_dump,
+;  shrink RW_BENCH to 0x00000EA0 (same as APP_FOC).
+; ============================================================
+
+LR_BENCH 0x01002000 0x00005800  {
+  ER_BENCH 0x01002000 0x00005800  {
+    *.o (RESET, +First)
+    *(InRoot$$Sections)
+    .ANY (+RO)
+  }
+  RW_BENCH 0x20000060 0x00000FA0  {
+    .ANY (+RW +ZI)
+  }
+}

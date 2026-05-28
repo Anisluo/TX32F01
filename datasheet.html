@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>TX32F01 — Bootloader / FreeRTOS / Coop 速查手册</title>
+<style>
+  :root {
+    --fg: #1a1a1a;
+    --bg: #fafafa;
+    --muted: #666;
+    --accent: #c0392b;
+    --code-bg: #f3f3f3;
+    --code-border: #e0e0e0;
+    --table-border: #d0d0d0;
+    --header-bg: #2c3e50;
+    --warn-bg: #fff8e1;
+    --warn-border: #ffc107;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei",
+                 "Source Han Sans CN", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.65;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+    font-size: 15px;
+  }
+  h1 {
+    font-size: 28px;
+    color: var(--header-bg);
+    border-bottom: 3px solid var(--header-bg);
+    padding-bottom: 8px;
+    margin-top: 0;
+  }
+  h2 {
+    font-size: 22px;
+    color: var(--header-bg);
+    border-left: 6px solid var(--accent);
+    padding-left: 12px;
+    margin-top: 48px;
+  }
+  h3 {
+    font-size: 17px;
+    color: var(--header-bg);
+    margin-top: 28px;
+  }
+  h4 {
+    font-size: 15px;
+    color: var(--muted);
+    margin-top: 16px;
+    margin-bottom: 4px;
+  }
+  p { margin: 8px 0 12px; }
+  strong { color: var(--accent); }
+  code {
+    font-family: "JetBrains Mono", "Fira Code", Consolas, Menlo, monospace;
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.92em;
+    border: 1px solid var(--code-border);
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    border-left: 4px solid var(--header-bg);
+    padding: 10px 14px;
+    overflow-x: auto;
+    border-radius: 4px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  pre code {
+    background: transparent;
+    padding: 0;
+    border: 0;
+    font-size: 13px;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 14px 0;
+    font-size: 14px;
+  }
+  th, td {
+    border: 1px solid var(--table-border);
+    padding: 7px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: var(--header-bg);
+    color: white;
+    font-weight: 600;
+  }
+  tr:nth-child(even) { background: #f5f5f5; }
+  ul, ol { padding-left: 24px; }
+  li { margin: 4px 0; }
+  hr {
+    border: 0;
+    border-top: 1px dashed #ccc;
+    margin: 36px 0;
+  }
+  .toc {
+    background: #eef3f7;
+    border: 1px solid #b8c7d5;
+    border-radius: 5px;
+    padding: 14px 20px;
+    margin: 18px 0 30px;
+  }
+  .toc h3 { margin: 0 0 8px; }
+  .toc ol { margin: 0; }
+  .warn {
+    background: var(--warn-bg);
+    border-left: 4px solid var(--warn-border);
+    padding: 10px 16px;
+    margin: 12px 0;
+    border-radius: 3px;
+  }
+  .kbd {
+    font-family: Consolas, monospace;
+    background: #e8e8e8;
+    border: 1px solid #aaa;
+    border-bottom-width: 2px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 0.85em;
+  }
+  /* anchors so links don't hide behind nothing */
+  h2[id], h3[id] { scroll-margin-top: 12px; }
+</style>
+</head>
+<body>
+
+<h1>TX32F01 — Bootloader / FreeRTOS / Coop 三件套速查手册</h1>
+
+<p style="color:var(--muted)">
+适用：Cortex-M0 · 24 MHz · 32 KB Flash · 4 KB SRAM
+&nbsp;|&nbsp; 工具链：Keil MDK-ARM V5（ARMCC 5.06）
+&nbsp;|&nbsp; 状态：硬件上端到端验证通过
+</p>
+
+<div class="toc">
+  <h3>目录</h3>
+  <ol>
+    <li><a href="#bl">Bootloader — 产品基础设施</a></li>
+    <li><a href="#rtos">FreeRTOS — 学习 / 复杂同步场景</a></li>
+    <li><a href="#coop">协作式调度器 — 量产首选</a></li>
+    <li><a href="#common">跨三者的共通原则</a></li>
+  </ol>
+</div>
+
+<!-- ==================== BL ==================== -->
+<h2 id="bl">一、Bootloader（产品基础设施）</h2>
+
+<h3>原理（一句话）</h3>
+<p>
+<strong>Dual-image + 元数据契约 + 软复位换 SP/PC</strong>。
+BL 用 Flash 头部 8 KB 装自己，剩余给 APP；通过 1 块 <em>meta</em> 和
+1 块 <em>boot flag</em> 在两次复位之间传状态；CM0 没 VTOR，所以
+BL 永久接管所有中断向量，靠 SRAM 软向量表转发给 APP。
+</p>
+
+<h3>必背配置（改一处错，板砖）</h3>
+<table>
+  <tr><th>项</th><th>必须值 / 公式</th><th>改错的后果</th></tr>
+  <tr><td>BL 链接基址</td><td><code>0x01000000</code></td><td>复位向量取错 → HardFault</td></tr>
+  <tr><td>BL 大小预算</td><td>≤ 8 KB (<code>0x2000</code>)</td><td>越界擦 APP 区</td></tr>
+  <tr><td>APP 链接基址</td><td><code>0x01002000</code>（sector 对齐）</td><td>与 BL 互撞</td></tr>
+  <tr><td>Meta sector</td><td><code>0x01007800</code></td><td>必须独占 1 个 512B sector</td></tr>
+  <tr><td>Boot flag sector</td><td><code>0x01007C00</code></td><td>同上</td></tr>
+  <tr><td>软向量表地址</td><td>SRAM <code>0x20000000</code>，96 B</td><td>App 的 RW 也用这片就崩</td></tr>
+  <tr><td>App scatter RAM</td><td><code>0x20000060</code> 起</td><td>不让出前 96 B 就覆盖软向量</td></tr>
+  <tr><td>Flash 编程时序</td>
+      <td><code>SCU_Unlock → Flash_SCU24MHz_ClkCfg → Flash_Unlock → Flash_Main_WriteEease_Enable → 设 PEKEYR → 写地址 → 等 IFR</code></td>
+      <td>漏一步 IFR 永远不置位</td></tr>
+</table>
+
+<h3>5 个坑（都踩过）</h3>
+<ol>
+  <li><strong>24 MHz 下必须调 <code>Flash_SCU24MHz_ClkCfg()</code></strong>，4 MHz 不用。混淆会让擦写永久 timeout。</li>
+  <li><strong>BL 不能给自己擦写</strong> — BL 想升级只能 SWD。所以 BL 第一版必须测稳。</li>
+  <li><strong><code>error_blink_forever()</code> 让 UART 静默</strong>。失败 1 次之后任何 ymodem 都不响应，必须 reset。生产用要保留串口 <code>[BL] error code 3</code> 提示而不是死循环。</li>
+  <li><strong>3 秒窗口太短</strong>：reset 完到 PC 端工具就绪可能 &gt;3s。生产建议 8s 或永久等（强制 boot flag）。</li>
+  <li><strong>HW CRC 范围是 inclusive</strong>：<code>Flash_CRC(start, end)</code> 算到 end 那一字节，别按 exclusive 算 size。</li>
+</ol>
+
+<!-- ==================== FreeRTOS ==================== -->
+<h2 id="rtos">二、FreeRTOS（学习 / 复杂同步场景）</h2>
+
+<h3>原理（一句话）</h3>
+<p>
+<strong>SysTick 触发 tick → 调度器决定要不要切换 → 置 PendSV pending → CM0 在中断退出尾部跑 PendSV → 保存当前任务 PSP / 加载下个任务 PSP</strong>。
+每个任务有自己的栈（PSP），内核/中断共用 MSP，CONTROL[1] 控制 SP 选择。
+</p>
+
+<h3>必背配置（FreeRTOSConfig.h）</h3>
+<table>
+  <tr><th>项</th><th>4KB SRAM 推荐值</th><th>不能这么改</th></tr>
+  <tr><td><code>configCPU_CLOCK_HZ</code></td><td>24000000</td><td>跟实际不符 → tick 错</td></tr>
+  <tr><td><code>configTICK_RATE_HZ</code></td><td>1000</td><td>高于 4kHz 浪费 CPU</td></tr>
+  <tr><td><code>configMAX_PRIORITIES</code></td><td>3</td><td>每加 1 个 readyList +12B SRAM</td></tr>
+  <tr><td><code>configMINIMAL_STACK_SIZE</code></td><td>64 words (256 B)</td><td>&lt;40 idle task 都跑不起来</td></tr>
+  <tr><td><code>configSUPPORT_STATIC_ALLOCATION</code></td><td>1</td><td>必须</td></tr>
+  <tr><td><code>configSUPPORT_DYNAMIC_ALLOCATION</code></td><td>0</td><td>节省 heap_x.c (2-4 KB)</td></tr>
+  <tr><td><code>configTOTAL_HEAP_SIZE</code></td><td>0</td><td>不用 heap</td></tr>
+  <tr><td><code>configUSE_PORT_OPTIMISED_TASK_SELECTION</code></td><td><strong>0</strong></td><td>CM0 没 CLZ 指令，开了崩</td></tr>
+  <tr><td><code>configUSE_MUTEXES/TIMERS/EVENT_GROUPS/...</code></td><td>全 0</td><td>每开一个 +几百 B Flash</td></tr>
+  <tr><td><code>configCHECK_FOR_STACK_OVERFLOW</code></td><td>0（性能）或 2（debug）</td><td>2 比 1 准</td></tr>
+</table>
+
+<h3>接 TX32F01 startup 的关键宏（3 行救命）</h3>
+<pre><code>#define vPortSVCHandler        SVC_Handler
+#define xPortPendSVHandler     PendSV_Handler
+#define xPortSysTickHandler    SysTick_Handler</code></pre>
+<p>
+FreeRTOS 默认函数名是 <code>xPortXxxHandler</code>，但 TX32F01 startup
+向量表填的是 CMSIS 标准名。这 3 行让 port.c 编译出的强符号自动覆盖
+startup 的 <code>[WEAK]</code> 符号。
+<strong>没这 3 行链接器找不到 PendSV，调度器永远不切换</strong>。
+</p>
+
+<h3>5 个坑</h3>
+<ol>
+  <li><strong>静态分配必须实现 <code>vApplicationGetIdleTaskMemory()</code></strong>，否则链接报错。</li>
+  <li><strong>任务不能 <code>return</code></strong> — 返回后会跳到 <code>prvTaskExitError</code> 无限循环。要么 <code>vTaskDelete(NULL)</code>，要么 <code>for(;;)</code>。</li>
+  <li><strong>CM0 临界区 = 全关中断</strong>（PRIMASK），不像 M3/M4 能 BASEPRI 屏蔽部分。临界区里别做长操作。</li>
+  <li><strong><code>xQueueSendFromISR</code> 这类 ISR 函数才能在 ISR 调</strong>，普通 <code>xQueueSend</code> 在 ISR 调会断言失败。</li>
+  <li><strong>要跑在 BL 之上</strong>：PendSV/SVC/SysTick 三个 handler <em>必须</em> 通过 <code>app_softvec_register_sys()</code> 注册，FreeRTOSConfig.h 那 3 行 #define 不能用了（因为 BL 占了那 3 个符号）。每次任务切换多 ~250 ns 跳板开销，可接受。</li>
+</ol>
+
+<!-- ==================== COOP ==================== -->
+<h2 id="coop">三、协作式调度器（量产首选）</h2>
+
+<h3>原理（一句话）</h3>
+<p>
+<strong>主循环遍历任务表，到点的就调一次然后返回，没人欠债时进 WFI 睡到下一个中断</strong>。
+所有任务共用同一个栈（主栈），没有上下文切换、没有 PendSV、没有 SVC。
+</p>
+
+<h3>必背配置（coop_sched.h + main.c）</h3>
+<table>
+  <tr><th>项</th><th>推荐</th><th>错的话</th></tr>
+  <tr><td>时间基</td><td>SysTick @ 1 ms</td><td>太快浪费 CPU，太慢 task 响应迟</td></tr>
+  <tr><td>任务表</td><td>静态 <code>coop_task_t s_tasks[]</code></td><td>别动态分配，破坏确定性</td></tr>
+  <tr><td><code>next_run = now + period</code></td>
+      <td><strong>不要用</strong> <code>+= period</code> 也别用 <code>now + period</code> 漂移版</td>
+      <td>漂移版长期看周期不准；<code>+= period</code> 在系统被打断后会"风暴执行"</td></tr>
+  <tr><td>任务函数原型</td><td><code>void f(void)</code> 无参</td><td>加参就要全局变量传，反而乱</td></tr>
+  <tr><td>任务内禁止</td><td><code>delay_ms()</code>、<code>while(uart_busy)</code>、<code>vTaskDelay()</code></td><td>卡死所有其他 task</td></tr>
+  <tr><td>跑在 BL 之上的 SysTick</td><td><code>app_softvec_register_systick(coop_tick)</code></td><td>BL 跳板找不到 ISR → tick 不走</td></tr>
+</table>
+
+<h3>1 个范式 + 5 个坑</h3>
+<p>
+<strong>范式</strong>：长操作必须 <strong>写成状态机</strong>。例：
+原来 <code>LED on; delay 50; off; delay 50; on; delay 800;</code> →
+拆成 6 个 50 ms 的状态步进。
+</p>
+
+<ol>
+  <li><strong>Task 必须 &lt; 1 个 tick 周期内跑完</strong>，否则下次该跑的 task 被延后。50 ms tick + 60 字节 UART 打印（5 ms @115200）= OK；500 字节就危险。</li>
+  <li><strong><code>uart_putc</code> polling 是阻塞的</strong>，但单字节只 87 μs，可接受。要快用 DMA + 状态机。</li>
+  <li><strong>共享变量加 <code>volatile</code></strong>（task ↔ ISR），但 CM0 上 32-bit 对齐字读写本身原子，不需要关中断。32-bit 以上（如 64-bit 计数）必须临界区。</li>
+  <li><strong>WFI 之前别关中断</strong> — <code>__disable_irq + __WFI + __enable_irq</code> 模式会让 ISR 在 <code>__enable_irq</code> 之后才跑，导致状态变量已过期。直接 <code>__WFI()</code> 即可（pending IRQ 立即唤醒）。</li>
+  <li><strong>CPU load 测量很易出 bug</strong>（我们就踩过）。简单可靠的做法：数 1 秒内 WFI 进入次数，作为粗略 idle 指标。要精确就外加一个不停止的 timer 测 idle 总时长。</li>
+</ol>
+
+<!-- ==================== COMMON ==================== -->
+<h2 id="common">四、跨三者的共通原则</h2>
+
+<h3>1. CM0 没 VTOR 是一切复杂度的根源</h3>
+<p>所有"为啥这么写"几乎都能追溯到这一点：</p>
+<ul>
+  <li>BL 必须永久接管所有 IRQ → 跳板机制</li>
+  <li>APP 不能改向量表位置 → 必须经过软向量表</li>
+  <li>FreeRTOS 跑在 BL 上要额外注册 3 个系统异常</li>
+</ul>
+
+<h3>2. Flash 写错就变砖，4 个安全栏杆</h3>
+<table>
+  <tr><th>栏杆</th><th>实现</th></tr>
+  <tr><td>地址校验</td><td><code>bflash_erase_app_range()</code> 拒绝写 BL 区</td></tr>
+  <tr><td>写前必擦</td><td>永远 <code>erase → program</code>，flash 只能 1→0</td></tr>
+  <tr><td>写后必校验</td><td>HW CRC + meta magic + size 范围</td></tr>
+  <tr><td>升级失败可回滚</td><td>meta 校验不过自动留 BL，不跳坏 APP</td></tr>
+</table>
+
+<h3>3. SRAM 4KB 的余量管理（最稀缺资源）</h3>
+<pre><code>0x20000000 ┌──────────────────┐
+           │ 软向量表    96 B │ ← BL 用，APP 不能动
+0x20000060 ├──────────────────┤
+           │ BL 或 APP 的 RW  │
+           │  ZI  /  stack    │ ← 谁占了多少全靠 .map 文件看
+0x20001000 └──────────────────┘
+
+BL:        ZI 1.6 KB（含 1 KB YMODEM 包缓冲）
+APP_RTOS:  ZI 1.6 KB（4 个 256 B 任务栈 + 内核数据）
+APP_COOP:  ZI 0.6 KB（共享一个 ~500 B 主栈）</code></pre>
+<p>新增功能前先看 <code>.map</code>，对 ZI 心里有数。</p>
+
+<h3>4. 调试三板斧</h3>
+<ol>
+  <li><strong>UART print</strong> — 第一手现场，任何状态都能看</li>
+  <li><strong>JLink halt + <code>regs</code> + <code>mem32</code></strong> — 看 PC/SP/向量表，PC 范围立判正常/跑飞</li>
+  <li><strong><code>.map</code> 文件</strong> — 算精确的 Flash/SRAM 占用，对比预算</li>
+</ol>
+
+<h3>5. 何时选谁</h3>
+<pre><code>SRAM &lt; 4KB  且需要复杂同步     → 换芯片（不要硬上 RTOS）
+SRAM &lt; 4KB  业务不复杂          → 协作式调度器 ★
+SRAM 4-8KB  少量任务            → 协作式 或 极简 FreeRTOS
+SRAM ≥ 16KB 多任务 / 实时性强   → FreeRTOS / RT-Thread / Zephyr</code></pre>
+
+<hr>
+
+<p style="text-align:center; color:var(--muted); font-size:13px;">
+  把这页存下来当 cheat sheet，下次回头看代码不会忘。<br>
+  完整仓库：<a href="https://github.com/Anisluo/TX32F01">https://github.com/Anisluo/TX32F01</a>
+</p>
+
+</body>
+</html>

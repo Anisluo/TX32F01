@@ -1,0 +1,22 @@
+; APP_TEST scatter — minimal APP@0x01002000 to validate BL+APP path
+;   - Flash : 0x01002000 .. 0x010077FF   (22 KB, well within budget)
+;   - SRAM  : 0x20000060 .. 0x20000EFF   (3744 B for RW/ZI/Stack)
+;   - NOINIT: 0x20000F00 .. 0x20000FFF   (reserved for fault_dump)
+;
+; Lined up to match every other APP_* in this tree so the same BL works
+; with all of them — APP_TEST is just the cheapest one to flash when you
+; need to confirm the BL handoff is alive.
+
+LR_TEST 0x01002000 0x00005800  {
+  ER_TEST 0x01002000 0x00005800  {
+    *.o (RESET, +First)
+    *(InRoot$$Sections)
+    .ANY (+RO)
+  }
+  RW_TEST 0x20000060 0x00000EA0  {
+    .ANY (+RW +ZI)
+  }
+  RW_FAULT 0x20000F00 UNINIT 0x00000100  {
+    .ANY (FAULT_NOINIT)
+  }
+}

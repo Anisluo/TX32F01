@@ -1,0 +1,21 @@
+; APP_LOG scatter: links behind bootloader at 0x01002000
+;   - Flash window: 0x01002000 .. 0x010077FF (22 KB)
+;   - SRAM window:  0x20000060 .. 0x20000EFF (3744 B for RW/ZI/Stack)
+;   - NOINIT       :  0x20000F00 .. 0x20000FFF (256 B reserved for fault_dump)
+;     The top 256 B are never zeroed by the C runtime, so HardFault context
+;     captured before reset can be read by the next boot. See fault_dump.h.
+LR_LOG 0x01002000 0x00005800  {
+  ER_LOG 0x01002000 0x00005800  {
+    *.o (RESET, +First)
+    *(InRoot$$Sections)
+    .ANY (+RO)
+  }
+  RW_LOG 0x20000060 0x00000EA0  {     ; was 0xFA0; shrunk by 0x100 for NOINIT
+    .ANY (+RW +ZI)
+  }
+  ; NOINIT region — declared but empty; no input sections placed here.
+  ; Lives at 0x20000F00..0x20000FFF; accessed by fault_dump.c via absolute pointer.
+  RW_FAULT 0x20000F00 UNINIT 0x00000100  {
+    .ANY (FAULT_NOINIT)
+  }
+}

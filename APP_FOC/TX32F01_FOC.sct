@@ -1,0 +1,14 @@
+; APP_FOC scatter: 链接到 0x01002000，避开 BL/META/BOOTFLAG/NVR
+; RAM 从 0x20000060 起，前 96 B 让给 BL 软向量表
+; RAM 末尾 256 B (0x20000F00..0x20000FFF) 让给 fault_dump 的 NOINIT 区
+;   → 4 KB SRAM 实际可给 APP 用：0x20000060..0x20000EFF = 0xEA0
+LR_APP 0x01002000 0x00005800  {
+  ER_APP 0x01002000 0x00005800  {
+    *.o (RESET, +First)
+    *(InRoot$$Sections)
+    .ANY (+RO)
+  }
+  RW_APP 0x20000060 0x00000EA0  {
+    .ANY (+RW +ZI)
+  }
+}

@@ -28,6 +28,15 @@ com*.log
 *.output
 bootflag.bin
 
+# LaTeX intermediate files (keep .tex and .pdf, drop the rest)
+*.aux
+*.toc
+*.out
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+tx32f01_*.log
+
 # OS junk
 Thumbs.db
 .DS_Store

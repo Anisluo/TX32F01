@@ -162,9 +162,19 @@ int main(void)
     BOOL force_bl     = (bflash_read_bootflag() == BOOT_REQ_UPDATE);
     BOOL app_ok       = bl_app_meta_valid();
 
+    /* DEV MODE: SWD-flashed APPs don't have meta written, so meta CRC is
+     * always invalid. Treating that as "APP OK" lets us iterate with
+     * Keil + J-Link instead of doing a full YMODEM cycle every build.
+     *
+     * Before shipping: delete this line so BL refuses to boot an APP
+     * whose meta hasn't been written (i.e., one that didn't come from
+     * a verified YMODEM session). */
+    app_ok = TRUE;
+
     if (!force_bl && app_ok) {
-        /* 8 秒升级窗口 —— 给 PC 端工具足够时间响应（PS 启动 + 打开 COM 慢）*/
-        if (wait_first_byte(8000U)) {
+        /* 8 秒升级窗口 —— 给 PC 端工具足够时间响应（PS 启动 + 打开 COM 慢）
+         * DEV: 调成 1000U（1 秒）加快 debug 循环；上线前改回 8000U。 */
+        if (wait_first_byte(1000U)) {
             do_upgrade_session();
             error_blink_forever(2);
         }

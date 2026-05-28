@@ -1,0 +1,11 @@
+; APP_IRQ scatter: same Flash/SRAM windows as APP_COOP/APP_LOG.
+LR_IRQ 0x01002000 0x00005800  {
+  ER_IRQ 0x01002000 0x00005800  {
+    *.o (RESET, +First)
+    *(InRoot$$Sections)
+    .ANY (+RO)
+  }
+  RW_IRQ 0x20000060 0x00000FA0  {
+    .ANY (+RW +ZI)
+  }
+}

@@ -1,7 +1,10 @@
 ; ============================================================
 ;  Application scatter file（替换 USER 工程原来的 .sct）
 ;    APP Flash: 0x01002000 - 0x010077FF   (22 KB)
-;    SRAM     : 0x20000060 - 0x20000FFF   (前 96B 是 BL 的软向量表)
+;    SRAM     : 0x20000060 - 0x20000EFF   (前 96B 是 BL 的软向量表;
+;                                          末 256B 0x20000F00..FFF 是
+;                                          fault_dump 的 NOINIT 区，
+;                                          见 APP_PATCH/fault_dump.h)
 ; ============================================================
 
 LR_APP 0x01002000 0x00005800  {
@@ -10,7 +13,7 @@ LR_APP 0x01002000 0x00005800  {
     *(InRoot$$Sections)
     .ANY (+RO)
   }
-  RW_APP 0x20000060 0x00000FA0  {
+  RW_APP 0x20000060 0x00000EA0  {
     .ANY (+RW +ZI)
   }
 }
